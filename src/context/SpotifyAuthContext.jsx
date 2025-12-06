@@ -12,7 +12,6 @@ const AuthContext = createContext({
 
 export const useSpotifyAuth = () => useContext(AuthContext);
 
-// Spotify API scopes needed
 const SCOPES = [
   "user-read-private",
   "user-read-email",
@@ -21,11 +20,33 @@ const SCOPES = [
   "user-library-read",
 ].join(" ");
 
-// Public Client ID from Spotify Developer Dashboard
 const CLIENT_ID = "f3868da12ebd4a599754a9e4e927f867";
+// Ensure this matches your Spotify Dashboard EXACTLY (including slash)
+const REDIRECT_URI = `${window.location.origin.replace(
+  "localhost",
+  "127.0.0.1"
+)}/callback`;
 
-// Calculate redirect URI dynamically to prevent mismatches
-const REDIRECT_URI = `${window.location.origin}/callback`;
+// PKCE Helpers
+const generateRandomString = (length) => {
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return values.reduce((acc, x) => acc + possible[x % possible.length], "");
+};
+
+const sha256 = async (plain) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest("SHA-256", data);
+};
+
+const base64encode = (input) => {
+  return btoa(String.fromCharCode(...new Uint8Array(input)))
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+};
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -34,7 +55,6 @@ export const AuthProvider = ({ children }) => {
   const [spotifyToken, setSpotifyToken] = useState(null);
 
   useEffect(() => {
-    // If we're on the callback page, let the callback page handle logic
     if (window.location.pathname === "/callback") {
       setLoading(false);
       return;
@@ -47,21 +67,18 @@ export const AuthProvider = ({ children }) => {
       setSpotifyToken(token);
       fetchUserProfile(token);
     } else {
-      localStorage.removeItem("spotify_token");
-      localStorage.removeItem("spotify_expires_at");
-      setLoading(false);
+      logout();
     }
   }, []);
 
   const fetchUserProfile = async (token) => {
     try {
       const response = await fetch("https://api.spotify.com/v1/me", {
+        // Corrected URL
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Spotify API Error:", response.status, errorData);
         throw new Error(`Failed to fetch user profile: ${response.status}`);
       }
 
@@ -76,18 +93,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = () => {
-    // Generate a random state value for security
-    const state = Math.random().toString(36).substring(2, 15);
-    localStorage.setItem("spotify_auth_state", state);
+  const login = async () => {
+    const codeVerifier = generateRandomString(64);
+    const hashed = await sha256(codeVerifier);
+    const codeChallenge = base64encode(hashed);
 
-    // Build the Spotify authorization URL
+    window.localStorage.setItem("spotify_code_verifier", codeVerifier);
+
+    // FIXED: Use the real Spotify Auth URL
     const authUrl = new URL("https://accounts.spotify.com/authorize");
     authUrl.searchParams.append("client_id", CLIENT_ID);
-    authUrl.searchParams.append("response_type", "token");
+    authUrl.searchParams.append("response_type", "code");
     authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
     authUrl.searchParams.append("scope", SCOPES);
-    authUrl.searchParams.append("state", state);
+    authUrl.searchParams.append("code_challenge_method", "S256");
+    authUrl.searchParams.append("code_challenge", codeChallenge);
 
     window.location.href = authUrl.toString();
   };
@@ -95,18 +115,21 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem("spotify_token");
     localStorage.removeItem("spotify_expires_at");
-    localStorage.removeItem("spotify_auth_state");
+    localStorage.removeItem("spotify_refresh_token");
+    localStorage.removeItem("spotify_code_verifier");
     setIsAuthenticated(false);
     setUser(null);
     setSpotifyToken(null);
     setLoading(false);
-    toast.success("Logged out successfully");
-    // Force reload to clear all state
-    window.location.href = "/";
+    if (window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, loading, user, spotifyToken, login, logout }}>
+    <AuthContext.Provider
+      value={{ isAuthenticated, loading, user, spotifyToken, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

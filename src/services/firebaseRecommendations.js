@@ -68,6 +68,7 @@ export const trackListening = async (userId, track) => {
 
 // Get AI recommendations with Fallback Strategy
 export const getAIRecommendations = async (userId) => {
+
   try {
     // 1. Get user listening history
     const listeningQuery = query(

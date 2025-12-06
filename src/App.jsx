@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import Callback from "./pages/Callback";
 import Playlist from "./pages/Playlist";
 import LikedSongs from "./pages/LikedSongs";
+import Settings from "./pages/Settings"; // Import Settings
 import { AuthProvider as SpotifyAuthProvider } from "@/context/SpotifyAuthContext";
 import { PlayerProvider } from "@/context/PlayerContext";
 
@@ -28,7 +29,8 @@ const App = () => (
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/playlist/:playlistId" element={<Playlist />} />
               <Route path="/liked-songs" element={<LikedSongs />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="/settings" element={<Settings />} />{" "}
+              {/* Add Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

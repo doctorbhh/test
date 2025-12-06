@@ -4,10 +4,19 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { usePlayer } from "@/context/PlayerContext";
 
-export function SongCard({ title, artist, imageUrl, imageGradient = "bg-gradient-primary", className, onClick, playlistId, track }) {
+export function SongCard({
+  title,
+  artist,
+  imageUrl,
+  imageGradient = "bg-gradient-primary",
+  className,
+  onClick,
+  playlistId,
+  track,
+}) {
   const navigate = useNavigate();
   const { playTrack } = usePlayer();
-  
+
   const handleClick = () => {
     if (onClick) {
       onClick();
@@ -15,14 +24,14 @@ export function SongCard({ title, artist, imageUrl, imageGradient = "bg-gradient
       navigate(`/playlist/${playlistId}`);
     }
   };
-  
+
   const handlePlay = async (e) => {
     e.stopPropagation();
     if (track) {
       await playTrack(track);
     }
   };
-  
+
   return (
     <div
       className={cn(
@@ -32,13 +41,18 @@ export function SongCard({ title, artist, imageUrl, imageGradient = "bg-gradient
       onClick={handleClick}
     >
       {imageUrl ? (
-        <img 
-          src={imageUrl} 
+        <img
+          src={imageUrl}
           alt={title}
           className="mb-4 aspect-square w-full rounded-md shadow-lg object-cover"
         />
       ) : (
-        <div className={cn("mb-4 aspect-square rounded-md shadow-lg flex items-center justify-center", imageGradient)}>
+        <div
+          className={cn(
+            "mb-4 aspect-square rounded-md shadow-lg flex items-center justify-center",
+            imageGradient
+          )}
+        >
           <Music2 className="h-12 w-12 text-white/60" />
         </div>
       )}
@@ -46,7 +60,7 @@ export function SongCard({ title, artist, imageUrl, imageGradient = "bg-gradient
         {title}
       </h3>
       <p className="truncate text-xs text-muted-foreground">{artist}</p>
-      
+
       <Button
         size="icon"
         onClick={handlePlay}

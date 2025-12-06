@@ -33,7 +33,7 @@ export function SearchDialog({ open, onClose }) {
   const formatDuration = (ms) => {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
   const handlePlayTrack = async (track) => {
@@ -51,7 +51,11 @@ export function SearchDialog({ open, onClose }) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder={isAuthenticated ? "Search for songs, artists, or albums..." : "Please login to search"}
+            placeholder={
+              isAuthenticated
+                ? "Search for songs, artists, or albums..."
+                : "Please login to search"
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-10"
@@ -61,7 +65,9 @@ export function SearchDialog({ open, onClose }) {
 
         {!isAuthenticated && (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">Please login with Spotify to search for music</p>
+            <p className="text-muted-foreground">
+              Please login with Spotify to search for music
+            </p>
           </div>
         )}
 
@@ -76,7 +82,9 @@ export function SearchDialog({ open, onClose }) {
 
             {!searching && searchResults.length === 0 && query && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No results found for "{query}"</p>
+                <p className="text-muted-foreground">
+                  No results found for "{query}"
+                </p>
               </div>
             )}
 
@@ -100,7 +108,9 @@ export function SearchDialog({ open, onClose }) {
                     </div>
 
                     <div className="flex-1">
-                      <p className="font-medium text-foreground">{track.name}</p>
+                      <p className="font-medium text-foreground">
+                        {track.name}
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         {track.artists?.map((a) => a.name).join(", ")}
                       </p>

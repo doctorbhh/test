@@ -1,98 +1,97 @@
-import { ChevronLeft, ChevronRight, User, ChevronDown, Music, Sparkles } from "lucide-react";
+import { Search, User, LogOut, Settings } from "lucide-react"; // Import Settings Icon
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/hooks/useAuth";
-import { useSpotifyData } from "@/hooks/useSpotifyData";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useState } from "react";
+import { SearchDialog } from "./SearchDialog";
 import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
+import { Link, useNavigate } from "react-router-dom"; // Import Link and useNavigate
 
 export function Header() {
-  const { user, profile, logout } = useAuth();
-  const { syncSpotifyData, getAIRecommendations, loading } = useSpotifyData();
-  const { isAuthenticated: spotifyAuthed, login: loginSpotify } = useSpotifyAuth();
-  return (
-    <header className="sticky top-0 z-40 flex items-center justify-between px-8 py-4 backdrop-blur-md">
-      <div className="flex items-center gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8 rounded-full bg-background/10 text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8 rounded-full bg-background/10 text-foreground"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+  const [searchOpen, setSearchOpen] = useState(false);
+  const { user, login, logout } = useSpotifyAuth();
+  const navigate = useNavigate(); // Add hook
 
-      <div className="flex items-center gap-2">
-        {!spotifyAuthed && (
-          <Button
-            variant="outline"
-            className="border-foreground/20 bg-background/10 text-foreground hover:bg-background/20"
-            onClick={loginSpotify}
-          >
-            <Music className="mr-2 h-4 w-4" />
-            Connect Spotify
-          </Button>
-        )}
-        {user && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => syncSpotifyData(user.id)}
-              disabled={loading}
-            >
-              Sync Data
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => getAIRecommendations(user.id)}
-              disabled={loading}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Get AI Recommendations
-            </Button>
-          </>
-        )}
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+  return (
+    <>
+      <header className="sticky top-0 z-40 w-full border-b border-white/5 bg-black/50 backdrop-blur-xl">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            {/* Settings Button */}
             <Button
               variant="ghost"
-              className="h-8 gap-1 rounded-full bg-background/90 px-2 text-foreground hover:bg-background"
+              size="icon"
+              onClick={() => navigate("/settings")}
+              title="Settings"
             >
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="Profile" className="h-6 w-6 rounded-full" />
-              ) : (
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
-                  <User className="h-4 w-4 text-primary-foreground" />
-                </div>
-              )}
-              <span className="text-sm">{profile?.display_name || 'Guest'}</span>
-              <ChevronDown className="h-4 w-4" />
+              <Settings className="h-5 w-5" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem>Account</DropdownMenuItem>
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </header>
+
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="relative h-9 w-9 rounded-full"
+                  >
+                    <Avatar className="h-9 w-9 border border-white/10">
+                      <AvatarImage
+                        src={user.images?.[0]?.url}
+                        alt={user.display_name}
+                      />
+                      <AvatarFallback>
+                        {user.display_name?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {user.display_name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={logout}
+                    className="text-red-500 focus:text-red-500"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                onClick={login}
+                size="sm"
+                className="bg-green-500 hover:bg-green-600 text-black font-semibold"
+              >
+                Login with Spotify
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+    </>
   );
 }

@@ -1,86 +1,105 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 const Callback = () => {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
+  const hasRun = useRef(false); // Prevent running twice in StrictMode
 
   useEffect(() => {
-    try {
-      // Check if we have the token in the URL hash
-      const hash = window.location.hash.substring(1);
+    if (hasRun.current) return;
+    hasRun.current = true;
 
-      if (!hash) {
+    const exchangeCodeForToken = async () => {
+      try {
         const searchParams = new URLSearchParams(window.location.search);
+        const code = searchParams.get("code");
         const errorParam = searchParams.get("error");
 
         if (errorParam) {
-          const errorMessage = `Spotify authorization error: ${errorParam}`;
-          console.error(errorMessage);
-          setError(errorMessage);
-          toast.error(errorMessage);
-          navigate("/");
-          return;
+          throw new Error(errorParam);
         }
 
-        setError("No hash fragment found in URL");
-        toast.error("Authentication failed: No response from Spotify");
-        navigate("/");
-        return;
+        if (!code) {
+          throw new Error("No authorization code found");
+        }
+
+        const codeVerifier = localStorage.getItem("spotify_code_verifier");
+        if (!codeVerifier) {
+          throw new Error("Missing code verifier");
+        }
+
+        // IMPORTANT: Must match the redirect_uri used in login exactly
+        const redirectUri = `${window.location.origin.replace(
+          "localhost",
+          "127.0.0.1"
+        )}/callback`;
+        const clientId = "f3868da12ebd4a599754a9e4e927f867";
+
+        const response = await fetch("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            client_id: clientId,
+            grant_type: "authorization_code",
+            code: code,
+            redirect_uri: redirectUri,
+            code_verifier: codeVerifier,
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error_description || "Failed to exchange code");
+        }
+
+        const data = await response.json();
+        const { access_token, expires_in, refresh_token } = data;
+
+        const expiresAt = Date.now() + expires_in * 1000;
+
+        localStorage.setItem("spotify_token", access_token);
+        localStorage.setItem("spotify_expires_at", expiresAt.toString());
+        if (refresh_token) {
+          localStorage.setItem("spotify_refresh_token", refresh_token);
+        }
+
+        // Clean up verifier
+        localStorage.removeItem("spotify_code_verifier");
+
+        toast.success("Successfully logged in!");
+
+        // Use window.location to ensure context reloads with new token
+        window.location.href = "/";
+      } catch (err) {
+        console.error("Auth Error:", err);
+        setError(err.message);
+        toast.error(`Login failed: ${err.message}`);
+        setTimeout(() => navigate("/"), 2000);
       }
+    };
 
-      const params = new URLSearchParams(hash);
-      const token = params.get("access_token");
-      const errorParam = params.get("error");
-
-      if (errorParam) {
-        const errorMessage = `Spotify auth error: ${errorParam}`;
-        console.error(errorMessage);
-        setError(errorMessage);
-        toast.error(`Spotify authentication error: ${errorParam}`);
-        navigate("/");
-        return;
-      }
-
-      if (!token) {
-        setError("No access token found in URL");
-        toast.error("Authentication failed: No token received");
-        navigate("/");
-        return;
-      }
-
-      // Calculate when the token expires
-      const expiresIn = params.get("expires_in");
-      const expiresAt = Date.now() + (parseInt(expiresIn || "3600") * 1000);
-
-      // Store the token and expiration time in localStorage
-      localStorage.setItem("spotify_token", token);
-      localStorage.setItem("spotify_expires_at", expiresAt.toString());
-
-      // Clean up the URL and navigate to home
-      window.history.replaceState({}, document.title, "/");
-
-      toast.success("Successfully logged in!");
-      navigate("/");
-    } catch (err) {
-      console.error("Error in callback processing:", err);
-      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
-      toast.error("An unexpected error occurred during login");
-      navigate("/");
-    }
+    exchangeCodeForToken();
   }, [navigate]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
       <div className="text-center">
-        <div className="mb-4">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-t-2 border-primary"></div>
-        </div>
-        <h2 className="text-xl font-medium">Logging you in...</h2>
-        <p className="mt-2 text-muted-foreground">Please wait while we connect to Spotify</p>
-        {error && (
-          <p className="mt-4 rounded-md bg-destructive/10 p-4 text-destructive">{error}</p>
+        {error ? (
+          <div className="text-destructive">
+            <h2 className="text-xl font-bold mb-2">Login Error</h2>
+            <p>{error}</p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-t-2 border-primary"></div>
+            </div>
+            <h2 className="text-xl font-medium">Finalizing login...</h2>
+          </>
         )}
       </div>
     </div>

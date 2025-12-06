@@ -6,11 +6,11 @@ const spotifyFetch = async (endpoint, token) => {
       'Content-Type': 'application/json',
     },
   });
-  
+
   if (!response.ok) {
     throw new Error(`Spotify API error: ${response.status}`);
   }
-  
+
   return response.json();
 };
 
@@ -34,19 +34,19 @@ export const getAllPlaylistTracks = async (token, playlistId) => {
   let allTracks = [];
   let offset = 0;
   const limit = 100; // Spotify's max limit per request
-  
+
   while (true) {
     const response = await getPlaylistTracks(token, playlistId, offset, limit);
     allTracks = [...allTracks, ...response.items];
-    
+
     // Check if there are more tracks to fetch
     if (response.next === null || response.items.length < limit) {
       break;
     }
-    
+
     offset += limit;
   }
-  
+
   return allTracks;
 };
 
@@ -60,3 +60,5 @@ export const searchTracks = async (token, query, offset = 0, limit = 20) => {
   const encodedQuery = encodeURIComponent(query);
   return spotifyFetch(`/search?q=${encodedQuery}&type=track&offset=${offset}&limit=${limit}`, token);
 };
+
+

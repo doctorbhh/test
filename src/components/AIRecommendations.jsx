@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getAIRecommendations } from "@/services/firebaseRecommendations";
 import { usePlayer } from "@/context/PlayerContext";
+import { searchTracks } from "@/services/spotifyservice"; // Import the search service
 
 export function AIRecommendations() {
   const { user, spotifyToken } = useSpotifyAuth();
@@ -16,55 +17,63 @@ export function AIRecommendations() {
 
   useEffect(() => {
     if (user?.id) {
-      fetchRecommendations();
+      // Optional: Check if we already have recommendations saved in local state/DB to avoid refetching on every mount
+      // For now, we wait for user action or just load if empty
     }
   }, [user]);
 
   const fetchRecommendations = async () => {
     if (!user?.id || !spotifyToken) return;
-    
+
     setLoading(true);
     try {
-      const recData = await getAIRecommendations(user.id, spotifyToken);
-      
-      // Convert recommendations to SpotifyTrack format
-      const tracks = await Promise.all(
-        recData.map(async (rec) => {
-          // Search for full track data from Spotify
-          const response = await fetch(
-            `https://api.spotify.com/v1/tracks/${rec.id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${spotifyToken}`
-              }
-            }
-          );
-          
-          if (response.ok) {
-            return await response.json();
+      // 1. Get raw text recommendations from Gemini
+      const recData = await getAIRecommendations(user.id);
+
+      if (!recData || recData.length === 0) {
+        toast.error(
+          "Could not generate recommendations. Try listening to more music first."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // 2. Search Spotify for each recommendation to get real metadata (images, preview_url, etc.)
+      const tracksPromises = recData.map(async (rec) => {
+        try {
+          const query = `track:${rec.track_name} artist:${rec.artist_name}`;
+          const searchResult = await searchTracks(spotifyToken, query, 0, 1);
+
+          if (searchResult?.tracks?.items?.length > 0) {
+            return searchResult.tracks.items[0]; // Return the actual Spotify track object
           }
-          
-          // Fallback to basic track structure
-          return {
-            id: rec.id,
-            name: rec.track_name,
-            artists: [{ name: rec.artist_name }],
-            duration_ms: 0,
-            uri: `spotify:track:${rec.id}`,
-            album: { name: '', images: [] },
-            popularity: 0
-          };
-        })
-      );
-      
-      setRecommendations(tracks);
+          return null;
+        } catch (err) {
+          console.warn(`Could not find track on Spotify: ${rec.track_name}`);
+          return null;
+        }
+      });
+
+      const resolvedTracks = await Promise.all(tracksPromises);
+      const validTracks = resolvedTracks.filter((track) => track !== null);
+
+      setRecommendations(validTracks);
       setHasGeneratedToday(true);
-      
-      // Add recommendations to queue
-      addManyToQueue(tracks);
-      toast.success("AI recommendations added to queue!");
+
+      if (validTracks.length > 0) {
+        // Add recommendations to queue
+        addManyToQueue(validTracks);
+        toast.success(
+          `Added ${validTracks.length} AI recommendations to queue!`
+        );
+      } else {
+        toast.error(
+          "AI suggested songs, but we couldn't find them on Spotify."
+        );
+      }
     } catch (error) {
-      console.error('Error fetching recommendations:', error);
+      console.error("Error fetching recommendations:", error);
+      toast.error("Failed to generate recommendations. Check your API key.");
     } finally {
       setLoading(false);
     }
@@ -90,9 +99,9 @@ export function AIRecommendations() {
             onClick={generateNewRecommendations}
             variant="outline"
             size="sm"
-            disabled={hasGeneratedToday}
+            disabled={loading}
           >
-            {hasGeneratedToday ? "Updated Today" : "Generate New"}
+            {hasGeneratedToday ? "Regenerate" : "Generate New"}
           </Button>
         )}
       </div>
@@ -100,20 +109,23 @@ export function AIRecommendations() {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">
+            Consulting the AI DJ...
+          </span>
         </div>
       ) : recommendations.length > 0 ? (
         <div>
           <p className="text-sm text-muted-foreground mb-4">
-            Based on your listening history and preferences
+            Based on your recent listening history
           </p>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-            {recommendations.slice(0, 16).map((track) => (
+            {recommendations.slice(0, 12).map((track) => (
               <div key={track.id} className="relative">
                 <SongCard
                   title={track.name}
-                  artist={track.artists?.map(a => a.name).join(', ')}
+                  artist={track.artists?.map((a) => a.name).join(", ")}
                   imageUrl={track.album?.images?.[0]?.url}
-                  imageGradient="bg-gradient-to-br from-primary/50 to-primary-glow/50"
+                  imageGradient="bg-gradient-to-br from-purple-500/20 to-blue-500/20"
                   track={track}
                 />
               </div>
@@ -121,13 +133,13 @@ export function AIRecommendations() {
           </div>
         </div>
       ) : (
-        <div className="text-center py-12 px-4 rounded-lg bg-card/60 backdrop-blur">
+        <div className="text-center py-12 px-4 rounded-lg bg-card/60 backdrop-blur border border-border/50">
           <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">
             No recommendations yet
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Listen to more songs to get personalized AI recommendations
+            Click generate to get a personalized playlist based on your taste.
           </p>
           <Button onClick={generateNewRecommendations} size="sm">
             Generate Recommendations

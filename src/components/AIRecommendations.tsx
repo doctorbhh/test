@@ -6,19 +6,17 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getAIRecommendations } from "@/services/firebaseRecommendations";
 import { usePlayer } from "@/context/PlayerContext";
-import { SpotifyTrack } from "@/types/spotify";
+import { searchTracks } from "@/services/spotifyservice"; // Import search service
 
 export function AIRecommendations() {
   const { user, spotifyToken } = useSpotifyAuth();
   const { addManyToQueue } = usePlayer();
-  const [recommendations, setRecommendations] = useState<SpotifyTrack[]>([]);
+  const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasGeneratedToday, setHasGeneratedToday] = useState(false);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchRecommendations();
-    }
+    // Optional: You could load saved recommendations from localStorage here
   }, [user]);
 
   const fetchRecommendations = async () => {
@@ -26,57 +24,56 @@ export function AIRecommendations() {
 
     setLoading(true);
     try {
-      // 1. Get text recommendations from Gemini (via Firebase service)
+      // 1. Get text-based recommendations from Gemini
       const recData = await getAIRecommendations(user.id);
 
-      // 2. Resolve these text recommendations into Spotify Tracks
-      const resolvedTracks = await Promise.all(
-        recData.map(async (rec) => {
-          try {
-            // Search Spotify for the specific track and artist
-            const query = `track:${rec.track_name} artist:${rec.artist_name}`;
-            const response = await fetch(
-              `https://api.spotify.com/v1/search?q=${encodeURIComponent(
-                query
-              )}&type=track&limit=1`,
-              {
-                headers: {
-                  Authorization: `Bearer ${spotifyToken}`,
-                },
-              }
-            );
+      if (!recData || recData.length === 0) {
+        toast.error(
+          "Could not generate recommendations. Ensure you have a listening history."
+        );
+        setLoading(false);
+        return;
+      }
 
-            if (response.ok) {
-              const data = await response.json();
-              const track = data.tracks?.items?.[0];
-              if (track) {
-                return track as SpotifyTrack;
-              }
-            }
-          } catch (err) {
-            console.error(`Failed to resolve track: ${rec.track_name}`, err);
+      // 2. Search Spotify for each song to get the real playable Track ID
+      const tracksPromises = recData.map(async (rec) => {
+        try {
+          // Construct a specific search query
+          const query = `track:${rec.track_name} artist:${rec.artist_name}`;
+          const searchResult = await searchTracks(spotifyToken, query, 0, 1);
+
+          if (searchResult?.tracks?.items?.length > 0) {
+            return searchResult.tracks.items[0]; // Return the real Spotify track object
           }
           return null;
-        })
-      );
+        } catch (err) {
+          console.warn(`Could not find track on Spotify: ${rec.track_name}`);
+          return null;
+        }
+      });
 
-      // Filter out any failed resolutions (nulls)
-      const validTracks = resolvedTracks.filter(
-        (t): t is SpotifyTrack => t !== null
-      );
+      // Filter out any songs that weren't found
+      const resolvedTracks = await Promise.all(tracksPromises);
+      const validTracks = resolvedTracks.filter((track) => track !== null);
 
       setRecommendations(validTracks);
       setHasGeneratedToday(true);
 
       if (validTracks.length > 0) {
         addManyToQueue(validTracks);
-        toast.success("AI recommendations added to queue!");
-      } else if (recData.length > 0) {
-        toast.error("Could not find recommendations on Spotify.");
+        toast.success(
+          `Added ${validTracks.length} AI recommendations to queue!`
+        );
+      } else {
+        toast.error(
+          "AI suggested songs, but we couldn't find them on Spotify."
+        );
       }
     } catch (error) {
       console.error("Error fetching recommendations:", error);
-      toast.error("Failed to generate recommendations.");
+      toast.error(
+        "Failed to generate recommendations. Check console for details."
+      );
     } finally {
       setLoading(false);
     }
@@ -102,9 +99,9 @@ export function AIRecommendations() {
             onClick={generateNewRecommendations}
             variant="outline"
             size="sm"
-            disabled={hasGeneratedToday}
+            disabled={loading}
           >
-            {hasGeneratedToday ? "Updated Today" : "Generate New"}
+            {hasGeneratedToday ? "Regenerate" : "Generate New"}
           </Button>
         )}
       </div>
@@ -112,20 +109,23 @@ export function AIRecommendations() {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">
+            Consulting the AI DJ...
+          </span>
         </div>
       ) : recommendations.length > 0 ? (
         <div>
           <p className="text-sm text-muted-foreground mb-4">
-            Based on your listening history and preferences (Powered by Gemini)
+            Based on your recent listening history
           </p>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-            {recommendations.slice(0, 16).map((track) => (
+            {recommendations.slice(0, 12).map((track) => (
               <div key={track.id} className="relative">
                 <SongCard
                   title={track.name}
                   artist={track.artists?.map((a) => a.name).join(", ")}
                   imageUrl={track.album?.images?.[0]?.url}
-                  imageGradient="bg-gradient-to-br from-primary/50 to-primary-glow/50"
+                  imageGradient="bg-gradient-to-br from-purple-500/20 to-blue-500/20"
                   track={track}
                 />
               </div>
@@ -133,13 +133,13 @@ export function AIRecommendations() {
           </div>
         </div>
       ) : (
-        <div className="text-center py-12 px-4 rounded-lg bg-card/60 backdrop-blur">
+        <div className="text-center py-12 px-4 rounded-lg bg-card/60 backdrop-blur border border-border/50">
           <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">
             No recommendations yet
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Listen to more songs to get personalized AI recommendations
+            Click generate to get a personalized playlist based on your taste.
           </p>
           <Button onClick={generateNewRecommendations} size="sm">
             Generate Recommendations

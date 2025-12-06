@@ -1,4 +1,11 @@
-import { ChevronLeft, ChevronRight, User, ChevronDown, Music, Sparkles } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  User,
+  ChevronDown,
+  Music,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,7 +21,8 @@ import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
 export function Header() {
   const { user, profile, logout } = useAuth();
   const { syncSpotifyData, getAIRecommendations, loading } = useSpotifyData();
-  const { isAuthenticated: spotifyAuthed, login: loginSpotify } = useSpotifyAuth();
+  const { isAuthenticated: spotifyAuthed, login: loginSpotify } =
+    useSpotifyAuth();
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between px-8 py-4 backdrop-blur-md">
       <div className="flex items-center gap-2">
@@ -66,7 +74,7 @@ export function Header() {
             </Button>
           </>
         )}
-        
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -74,13 +82,19 @@ export function Header() {
               className="h-8 gap-1 rounded-full bg-background/90 px-2 text-foreground hover:bg-background"
             >
               {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="Profile" className="h-6 w-6 rounded-full" />
+                <img
+                  src={profile.avatar_url}
+                  alt="Profile"
+                  className="h-6 w-6 rounded-full"
+                />
               ) : (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
                   <User className="h-4 w-4 text-primary-foreground" />
                 </div>
               )}
-              <span className="text-sm">{profile?.display_name || 'Guest'}</span>
+              <span className="text-sm">
+                {profile?.display_name || "Guest"}
+              </span>
               <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
