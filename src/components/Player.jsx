@@ -47,9 +47,9 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
       setLoading(true);
       setError(null);
       try {
-        const query = `${trackName} ${artistName}`;
+        const query = `${trackName} ${artistName} official music video`;
 
-        // 1. Search Piped API
+        // 1. Search using Piped API to find the ID (No API Key needed)
         const response = await fetch(
           `https://api.piped.private.coffee/search?q=${encodeURIComponent(
             query
@@ -82,53 +82,56 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
   }, [trackName, artistName]);
 
   // Use createPortal to force this div to be a direct child of <body>
-  // This guarantees it covers the ENTIRE screen and is never hidden behind other elements.
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black w-screen h-screen overflow-hidden flex flex-col">
-      {/* --- CLOSE BUTTON (Floating Top Right) --- */}
-      <button
-        onClick={onClose}
-        className="absolute top-6 right-6 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full p-3 transition-all transform hover:scale-110 backdrop-blur-md border border-white/10 group"
-        title="Close Full Screen"
-      >
-        <X
-          size={32}
-          className="group-hover:rotate-90 transition-transform duration-300"
-        />
-      </button>
+    <div className="fixed inset-0 z-[9999] bg-black/95 w-screen h-screen flex flex-col items-center justify-center backdrop-blur-md">
+      {/* --- CONTENT WRAPPER --- */}
+      <div className="relative w-full max-w-6xl flex flex-col items-end px-4">
+        {/* --- CLOSE BUTTON (Floating Top Right of Video) --- */}
+        <button
+          onClick={onClose}
+          className="mb-4 bg-red-600 hover:bg-red-700 text-white rounded-full p-3 shadow-lg transition-transform hover:scale-110 flex items-center justify-center border border-white/10"
+          title="Close Video"
+        >
+          <X size={32} strokeWidth={2.5} />
+        </button>
 
-      {/* --- FULL SCREEN VIDEO CONTAINER --- */}
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center text-white gap-4">
-            <Loader2 className="h-16 w-16 animate-spin text-red-600" />
-            <p className="text-2xl font-light tracking-wide">
-              Loading Video...
-            </p>
+        {/* --- VIDEO CONTAINER --- */}
+        <div className="w-full bg-zinc-950 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden relative">
+          <div className="relative pt-[56.25%] w-full bg-black">
+            {loading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-4">
+                <Loader2 className="h-16 w-16 animate-spin text-red-600" />
+                <p className="text-xl font-light tracking-wide">
+                  Loading Video...
+                </p>
+              </div>
+            ) : error ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-6">
+                <MonitorPlay size={80} className="opacity-30" />
+                <p className="text-2xl font-medium">{error}</p>
+                <Button
+                  onClick={onClose}
+                  variant="outline"
+                  size="lg"
+                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                >
+                  Close Player
+                </Button>
+              </div>
+            ) : videoId ? (
+              // --- OFFICIAL YOUTUBE EMBED ---
+              <iframe
+                className="absolute top-0 left-0 w-full h-full"
+                // Using standard YouTube embed URL
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&origin=${window.location.origin}`}
+                title="YouTube Video Player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              ></iframe>
+            ) : null}
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center text-zinc-500 gap-6">
-            <MonitorPlay size={80} className="opacity-30" />
-            <p className="text-2xl font-medium">{error}</p>
-            <Button
-              onClick={onClose}
-              variant="outline"
-              size="lg"
-              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-            >
-              Close Player
-            </Button>
-          </div>
-        ) : videoId ? (
-          <iframe
-            className="w-full h-full"
-            src={`https://piped.video/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3`}
-            title="Full Screen Video Player"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          ></iframe>
-        ) : null}
+        </div>
       </div>
     </div>,
     document.body // Render directly into the body tag
@@ -293,7 +296,7 @@ export function Player() {
 
   return (
     <>
-      {/* --- VIDEO POPUP (Now Full Screen & Portaled) --- */}
+      {/* --- VIDEO POPUP (Full Screen) --- */}
       {isVideoOpen && currentTrack && (
         <VideoModal
           trackName={currentTrack.name}
@@ -439,7 +442,7 @@ export function Player() {
 
           {/* RIGHT SECTION: Volume & Extras */}
           <div className="flex w-[30%] min-w-0 items-center justify-end gap-3 sm:gap-5">
-            {/* --- VIDEO BUTTON --- */}
+            {/* --- VIDEO BUTTON (MonitorPlay Icon) --- */}
             {currentTrack && (
               <Button
                 size="icon"
