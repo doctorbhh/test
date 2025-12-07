@@ -31,7 +31,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom"; // Required for full screen on top
+import { createPortal } from "react-dom"; // Import createPortal
 import { usePlayer } from "@/context/PlayerContext";
 
 // --- FULL SCREEN VIDEO OVERLAY ---
@@ -49,7 +49,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
       try {
         const query = `${trackName} ${artistName} official music video`;
 
-        // 1. SEARCH: Use Piped API (No API Key needed, bypasses auth)
+        // 1. SEARCH: Use Piped API (No API Key needed)
         const response = await fetch(
           `https://api.piped.private.coffee/search?q=${encodeURIComponent(
             query
@@ -81,22 +81,23 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
     findVideoId();
   }, [trackName, artistName]);
 
-  // Use createPortal to render directly into body (on top of everything)
+  // Use createPortal to render OUTSIDE the React root, directly into document.body
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black w-screen h-screen flex flex-col">
-      {/* --- HEADER / CLOSE BUTTON --- */}
-      {/* Floating UI on top of the video */}
-      <div className="absolute top-0 left-0 right-0 p-6 flex justify-end z-50 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
-        <button
-          onClick={onClose}
-          className="pointer-events-auto bg-black/40 hover:bg-red-600 text-white rounded-full p-3 backdrop-blur-md border border-white/10 transition-all hover:scale-110 shadow-xl"
-          title="Close Player"
-        >
-          <X size={32} strokeWidth={2} />
-        </button>
-      </div>
+    <div
+      className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center"
+      // Use Max Safe Integer for z-index to ensure it sits on top of EVERYTHING
+      style={{ zIndex: 2147483647 }}
+    >
+      {/* --- CLOSE BUTTON (Top Right Corner) --- */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-50 p-3 bg-black/60 hover:bg-red-600 text-white rounded-full transition-all hover:scale-110 border border-white/10 backdrop-blur-md shadow-xl"
+        title="Close Player"
+      >
+        <X size={32} strokeWidth={2.5} />
+      </button>
 
-      {/* --- VIDEO PLAYER CONTAINER (FULL SIZE) --- */}
+      {/* --- VIDEO PLAYER CONTAINER --- */}
       <div className="w-full h-full flex items-center justify-center bg-black">
         {loading ? (
           <div className="flex flex-col items-center justify-center text-white gap-6">
@@ -119,7 +120,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
             </Button>
           </div>
         ) : videoId ? (
-          // --- PLAY: Official YouTube Embed ---
+          // --- OFFICIAL YOUTUBE EMBED ---
           <iframe
             className="w-full h-full"
             src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&origin=${window.location.origin}`}
@@ -127,11 +128,12 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
+            style={{ width: "100%", height: "100%" }}
           ></iframe>
         ) : null}
       </div>
     </div>,
-    document.body
+    document.body // Render directly into the <body> tag
   );
 };
 
@@ -439,7 +441,7 @@ export function Player() {
 
           {/* RIGHT SECTION: Volume & Extras */}
           <div className="flex w-[30%] min-w-0 items-center justify-end gap-3 sm:gap-5">
-            {/* --- VIDEO BUTTON --- */}
+            {/* --- VIDEO BUTTON (MonitorPlay Icon) --- */}
             {currentTrack && (
               <Button
                 size="icon"
