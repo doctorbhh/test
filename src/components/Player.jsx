@@ -13,7 +13,7 @@ import {
   Heart,
   Loader2,
   Download,
-  MonitorPlay, // NEW ICON IMPORTED
+  MonitorPlay,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,9 +31,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom"; // Required for full screen on top
 import { usePlayer } from "@/context/PlayerContext";
 
-// --- POPUP VIDEO PAGE ---
+// --- FULL SCREEN VIDEO PAGE ---
 const VideoModal = ({ trackName, artistName, onClose }) => {
   const [videoId, setVideoId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
         // 2. Extract ID safely
         if (data.items && data.items.length > 0) {
           const firstItem = data.items[0];
+          // Piped returns "/watch?v=ID" -> We split by "=" to get the ID
           const urlParts = firstItem.url.split("=");
           const id = urlParts[urlParts.length - 1];
           setVideoId(id);
@@ -79,52 +81,57 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
     findVideoId();
   }, [trackName, artistName]);
 
-  return (
-    // Fixed overlay covering the whole screen
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
-      {/* Wrapper for content */}
-      <div className="relative w-full max-w-6xl flex flex-col items-end">
-        {/* --- CLOSE BUTTON (Moved Outside the Video Box) --- */}
-        {/* This ensures it is NEVER hidden by the iframe */}
-        <button
-          onClick={onClose}
-          className="mb-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-[0_0_15px_rgba(255,0,0,0.5)] transition-transform hover:scale-110 flex items-center justify-center"
-          title="Close Video"
-        >
-          <X size={28} strokeWidth={2.5} />
-        </button>
+  // Use createPortal to force this div to be a direct child of <body>
+  // This guarantees it covers the ENTIRE screen and is never hidden behind other elements.
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-black w-screen h-screen overflow-hidden flex flex-col">
+      {/* --- CLOSE BUTTON (Floating Top Right) --- */}
+      <button
+        onClick={onClose}
+        className="absolute top-6 right-6 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full p-3 transition-all transform hover:scale-110 backdrop-blur-md border border-white/10 group"
+        title="Close Full Screen"
+      >
+        <X
+          size={32}
+          className="group-hover:rotate-90 transition-transform duration-300"
+        />
+      </button>
 
-        {/* --- VIDEO CONTAINER --- */}
-        <div className="w-full bg-zinc-950 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden relative">
-          <div className="relative pt-[56.25%] w-full bg-black">
-            {loading ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-4">
-                <Loader2 className="h-16 w-16 animate-spin text-red-600" />
-                <p className="text-xl font-semibold">Searching for video...</p>
-              </div>
-            ) : error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-400 gap-4">
-                <MonitorPlay size={64} className="opacity-50" />
-                <p className="text-xl">{error}</p>
-                <Button onClick={onClose} variant="secondary">
-                  Close
-                </Button>
-              </div>
-            ) : videoId ? (
-              <iframe
-                className="absolute top-0 left-0 w-full h-full"
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&origin=${window.location.origin}`}
-                title="YouTube video player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              ></iframe>
-            ) : null}
+      {/* --- FULL SCREEN VIDEO CONTAINER --- */}
+      <div className="w-full h-full flex items-center justify-center bg-black">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center text-white gap-4">
+            <Loader2 className="h-16 w-16 animate-spin text-red-600" />
+            <p className="text-2xl font-light tracking-wide">
+              Loading Video...
+            </p>
           </div>
-        </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center text-zinc-500 gap-6">
+            <MonitorPlay size={80} className="opacity-30" />
+            <p className="text-2xl font-medium">{error}</p>
+            <Button
+              onClick={onClose}
+              variant="outline"
+              size="lg"
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+            >
+              Close Player
+            </Button>
+          </div>
+        ) : videoId ? (
+          <iframe
+            className="w-full h-full"
+            src={`https://piped.video/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3`}
+            title="Full Screen Video Player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          ></iframe>
+        ) : null}
       </div>
-    </div>
+    </div>,
+    document.body // Render directly into the body tag
   );
 };
 
@@ -286,7 +293,7 @@ export function Player() {
 
   return (
     <>
-      {/* --- VIDEO POPUP PAGE --- */}
+      {/* --- VIDEO POPUP (Now Full Screen & Portaled) --- */}
       {isVideoOpen && currentTrack && (
         <VideoModal
           trackName={currentTrack.name}
@@ -432,14 +439,14 @@ export function Player() {
 
           {/* RIGHT SECTION: Volume & Extras */}
           <div className="flex w-[30%] min-w-0 items-center justify-end gap-3 sm:gap-5">
-            {/* Watch Video Button */}
+            {/* --- VIDEO BUTTON --- */}
             {currentTrack && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9 text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all"
+                className="h-9 w-9 text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors"
                 onClick={() => setIsVideoOpen(true)}
-                title="Watch Music Video"
+                title="Watch Video"
               >
                 <MonitorPlay className="h-5 w-5" />
               </Button>
