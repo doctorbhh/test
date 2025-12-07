@@ -34,7 +34,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom"; // Required for full screen on top
 import { usePlayer } from "@/context/PlayerContext";
 
-// --- FULL SCREEN VIDEO PAGE ---
+// --- FULL SCREEN VIDEO OVERLAY ---
 const VideoModal = ({ trackName, artistName, onClose }) => {
   const [videoId, setVideoId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
       try {
         const query = `${trackName} ${artistName} official music video`;
 
-        // 1. Search using Piped API to find the ID (No API Key needed)
+        // 1. SEARCH: Use Piped API (No API Key needed, bypasses auth)
         const response = await fetch(
           `https://api.piped.private.coffee/search?q=${encodeURIComponent(
             query
@@ -60,7 +60,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
 
         const data = await response.json();
 
-        // 2. Extract ID safely
+        // 2. EXTRACT ID
         if (data.items && data.items.length > 0) {
           const firstItem = data.items[0];
           // Piped returns "/watch?v=ID" -> We split by "=" to get the ID
@@ -81,60 +81,57 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
     findVideoId();
   }, [trackName, artistName]);
 
-  // Use createPortal to force this div to be a direct child of <body>
+  // Use createPortal to render directly into body (on top of everything)
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/95 w-screen h-screen flex flex-col items-center justify-center backdrop-blur-md">
-      {/* --- CONTENT WRAPPER --- */}
-      <div className="relative w-full max-w-6xl flex flex-col items-end px-4">
-        {/* --- CLOSE BUTTON (Floating Top Right of Video) --- */}
+    <div className="fixed inset-0 z-[9999] bg-black w-screen h-screen flex flex-col">
+      {/* --- HEADER / CLOSE BUTTON --- */}
+      {/* Floating UI on top of the video */}
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-end z-50 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
         <button
           onClick={onClose}
-          className="mb-4 bg-red-600 hover:bg-red-700 text-white rounded-full p-3 shadow-lg transition-transform hover:scale-110 flex items-center justify-center border border-white/10"
-          title="Close Video"
+          className="pointer-events-auto bg-black/40 hover:bg-red-600 text-white rounded-full p-3 backdrop-blur-md border border-white/10 transition-all hover:scale-110 shadow-xl"
+          title="Close Player"
         >
-          <X size={32} strokeWidth={2.5} />
+          <X size={32} strokeWidth={2} />
         </button>
+      </div>
 
-        {/* --- VIDEO CONTAINER --- */}
-        <div className="w-full bg-zinc-950 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden relative">
-          <div className="relative pt-[56.25%] w-full bg-black">
-            {loading ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-4">
-                <Loader2 className="h-16 w-16 animate-spin text-red-600" />
-                <p className="text-xl font-light tracking-wide">
-                  Loading Video...
-                </p>
-              </div>
-            ) : error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-6">
-                <MonitorPlay size={80} className="opacity-30" />
-                <p className="text-2xl font-medium">{error}</p>
-                <Button
-                  onClick={onClose}
-                  variant="outline"
-                  size="lg"
-                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                >
-                  Close Player
-                </Button>
-              </div>
-            ) : videoId ? (
-              // --- OFFICIAL YOUTUBE EMBED ---
-              <iframe
-                className="absolute top-0 left-0 w-full h-full"
-                // Using standard YouTube embed URL
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&origin=${window.location.origin}`}
-                title="YouTube Video Player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              ></iframe>
-            ) : null}
+      {/* --- VIDEO PLAYER CONTAINER (FULL SIZE) --- */}
+      <div className="w-full h-full flex items-center justify-center bg-black">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center text-white gap-6">
+            <Loader2 className="h-20 w-20 animate-spin text-red-600" />
+            <p className="text-2xl font-light tracking-widest uppercase opacity-80">
+              Searching Video
+            </p>
           </div>
-        </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center text-zinc-500 gap-6">
+            <MonitorPlay size={100} className="opacity-20" />
+            <p className="text-3xl font-medium">{error}</p>
+            <Button
+              onClick={onClose}
+              variant="outline"
+              size="lg"
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-lg px-8 py-6"
+            >
+              Close
+            </Button>
+          </div>
+        ) : videoId ? (
+          // --- PLAY: Official YouTube Embed ---
+          <iframe
+            className="w-full h-full"
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&origin=${window.location.origin}`}
+            title="YouTube Video Player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          ></iframe>
+        ) : null}
       </div>
     </div>,
-    document.body // Render directly into the body tag
+    document.body
   );
 };
 
@@ -442,7 +439,7 @@ export function Player() {
 
           {/* RIGHT SECTION: Volume & Extras */}
           <div className="flex w-[30%] min-w-0 items-center justify-end gap-3 sm:gap-5">
-            {/* --- VIDEO BUTTON (MonitorPlay Icon) --- */}
+            {/* --- VIDEO BUTTON --- */}
             {currentTrack && (
               <Button
                 size="icon"
