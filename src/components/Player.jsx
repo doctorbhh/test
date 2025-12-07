@@ -31,7 +31,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom"; // Import createPortal
+import { createPortal } from "react-dom";
 import { usePlayer } from "@/context/PlayerContext";
 
 // --- FULL SCREEN VIDEO OVERLAY ---
@@ -49,7 +49,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
       try {
         const query = `${trackName} ${artistName} official music video`;
 
-        // 1. SEARCH: Use Piped API (No API Key needed)
+        // 1. SEARCH: Use Piped API
         const response = await fetch(
           `https://api.piped.private.coffee/search?q=${encodeURIComponent(
             query
@@ -63,7 +63,6 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
         // 2. EXTRACT ID
         if (data.items && data.items.length > 0) {
           const firstItem = data.items[0];
-          // Piped returns "/watch?v=ID" -> We split by "=" to get the ID
           const urlParts = firstItem.url.split("=");
           const id = urlParts[urlParts.length - 1];
           setVideoId(id);
@@ -81,21 +80,21 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
     findVideoId();
   }, [trackName, artistName]);
 
-  // Use createPortal to render OUTSIDE the React root, directly into document.body
   return createPortal(
     <div
       className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-center justify-center"
-      // Use Max Safe Integer for z-index to ensure it sits on top of EVERYTHING
       style={{ zIndex: 2147483647 }}
     >
-      {/* --- CLOSE BUTTON (Top Right Corner) --- */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-50 p-3 bg-black/60 hover:bg-red-600 text-white rounded-full transition-all hover:scale-110 border border-white/10 backdrop-blur-md shadow-xl"
-        title="Close Player"
-      >
-        <X size={32} strokeWidth={2.5} />
-      </button>
+      {/* --- CLOSE BUTTON --- */}
+      <div className="absolute top-4 right-4 z-50">
+        <button
+          onClick={onClose}
+          className="bg-transparent hover:bg-white/10 text-white/50 hover:text-white rounded-full p-4 transition-all hover:scale-110 flex items-center justify-center"
+          title="Close Player"
+        >
+          <X size={32} strokeWidth={2} />
+        </button>
+      </div>
 
       {/* --- VIDEO PLAYER CONTAINER --- */}
       <div className="w-full h-full flex items-center justify-center bg-black">
@@ -123,7 +122,16 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
           // --- OFFICIAL YOUTUBE EMBED ---
           <iframe
             className="w-full h-full"
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&origin=${window.location.origin}`}
+            // PARAMETERS EXPLAINED:
+            // autoplay=1       -> Starts video immediately
+            // controls=1       -> SHOWS player bar (needed for Fullscreen button)
+            // fs=1             -> ENABLES Fullscreen button
+            // rel=0            -> Limits related videos to same channel
+            // loop=1           -> LOOPS video (Crucial to hide "End Screen" suggestions)
+            // playlist={id}    -> Required for loop=1 to work on a single video
+            // iv_load_policy=3 -> Hides annotations
+            // modestbranding=1 -> Minimal YouTube branding
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&fs=1&rel=0&iv_load_policy=3&modestbranding=1&loop=1&playlist=${videoId}&origin=${window.location.origin}`}
             title="YouTube Video Player"
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -133,7 +141,7 @@ const VideoModal = ({ trackName, artistName, onClose }) => {
         ) : null}
       </div>
     </div>,
-    document.body // Render directly into the <body> tag
+    document.body
   );
 };
 
@@ -163,10 +171,8 @@ export function Player() {
   const [localProgress, setLocalProgress] = useState([0]);
   const [localVolume, setLocalVolume] = useState([volume * 100]);
 
-  // Video State
   const [isVideoOpen, setIsVideoOpen] = useState(false);
 
-  // Lyrics State
   const [syncedLyrics, setSyncedLyrics] = useState([]);
   const [plainLyrics, setPlainLyrics] = useState("");
   const [currentLyricIndex, setCurrentLyricIndex] = useState(-1);
@@ -189,7 +195,6 @@ export function Player() {
     setLocalVolume([volume * 100]);
   }, [volume]);
 
-  // --- LYRIC SYNC ---
   useEffect(() => {
     if (syncedLyrics.length > 0) {
       let activeIdx = -1;
@@ -447,7 +452,13 @@ export function Player() {
                 size="icon"
                 variant="ghost"
                 className="h-9 w-9 text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors"
-                onClick={() => setIsVideoOpen(true)}
+                onClick={() => {
+                  setIsVideoOpen(true);
+                  // PAUSE AUDIO IF PLAYING
+                  if (isPlaying) {
+                    togglePlayPause();
+                  }
+                }}
                 title="Watch Video"
               >
                 <MonitorPlay className="h-5 w-5" />
