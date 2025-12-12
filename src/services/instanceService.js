@@ -5,7 +5,7 @@ const STORAGE_KEY_INSTANCE = 'ragam_selected_instance';
 const STORAGE_KEY_QUALITY = 'ragam_audio_quality';
 const STORAGE_KEY_PROVIDER = 'ragam_search_provider';
 
-export const DEFAULT_INSTANCE = 'https://api.piped.private.coffee';
+export const DEFAULT_INSTANCE = 'https://shashwat-coding.github.io/ytify-backend/';
 export const DEFAULT_QUALITY = 'high';
 export const DEFAULT_PROVIDER = 'youtube'; // 'youtube' or 'jiosaavn'
 
